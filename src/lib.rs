@@ -55,12 +55,6 @@ impl Plugin for ConsolePlugin {
         app.insert_command("debug_click", commands::click::debug_click);
         app.add_observer(commands::click::debug_click_observer);
     }
-
-    fn finish(&self, app: &mut App) {
-        if !app.is_plugin_added::<bevy_egui::prelude::EguiPlugin>() {
-            app.add_plugins(bevy_egui::prelude::EguiPlugin::default());
-        }
-    }
 }
 
 /// Console configuration resource
