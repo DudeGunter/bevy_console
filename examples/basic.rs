@@ -11,7 +11,7 @@ fn main() {
             ConsolePlugin,
         ))
         .add_systems(Startup, spawn_camera)
-        .add_system_command("67", special)
+        .add_command_named("67", special)
         .run();
 }
 

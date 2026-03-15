@@ -39,9 +39,9 @@ impl Plugin for ConsolePlugin {
 
         use app_ext::*;
         use default_commands::*;
-        app.add_system_command("clear", clear);
-        app.add_system_command("help", help);
-        app.add_system_command("quit", quit);
+        app.add_command(clear);
+        app.add_command(help);
+        app.add_command(quit);
     }
 }
 

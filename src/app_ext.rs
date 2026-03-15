@@ -2,41 +2,57 @@ use crate::commands::*;
 use bevy::prelude::*;
 
 pub trait ConsoleAppExt {
-    fn add_system_command<S: Into<String>, M: 'static>(
+    fn add_command<M: 'static, F>(&mut self, system: F) -> &mut Self
+    where
+        F: IntoSystem<(), (), M> + Send + Sync + 'static;
+
+    fn add_command_named<S: Into<String>, M: 'static>(
         &mut self,
-        string: S,
+        name: S,
         system: impl IntoSystem<(), (), M> + Send + Sync + 'static,
     ) -> &mut Self;
 
-    fn add_system_piped_command<S: Into<String>, M: 'static>(
+    fn add_command_piped<M: 'static, F>(&mut self, system: F) -> &mut Self
+    where
+        F: IntoSystem<In<Vec<String>>, (), M> + Send + Sync + 'static;
+
+    fn add_command_piped_named<S: Into<String>, M: 'static>(
         &mut self,
-        string: S,
+        name: S,
         system: impl IntoSystem<In<Vec<String>>, (), M> + Send + Sync + 'static,
     ) -> &mut Self;
 
-    fn add_event<E>(&mut self) -> &mut Self
+    fn add_command_event<E>(&mut self) -> &mut Self
     where
         E: Event + Default + Clone,
         for<'a> E::Trigger<'a>: Default;
 
-    fn add_event_command<S, E>(&mut self, string: S, event: E) -> &mut Self
+    fn add_command_event_named<S, E>(&mut self, name: S, event: E) -> &mut Self
     where
         S: Into<String>,
         E: Event + Clone,
         for<'a> E::Trigger<'a>: Default;
 
-    fn add_message<M: Message + Default + Clone>(&mut self) -> &mut Self;
+    fn add_command_message<M: Message + Default + Clone>(&mut self) -> &mut Self;
 
-    fn add_message_command<S: Into<String>, M: Message + Clone>(
+    fn add_command_message_named<S: Into<String>, M: Message + Clone>(
         &mut self,
-        string: S,
+        name: S,
         message: M,
     ) -> &mut Self;
 }
-
 impl ConsoleAppExt for App {
+    fn add_command<M: 'static, F>(&mut self, system: F) -> &mut Self
+    where
+        F: IntoSystem<(), (), M> + Send + Sync + 'static,
+    {
+        let name = short_type_name::<F>();
+        self.add_command_named(name, system);
+        self
+    }
+
     /// Runs the given system when the command is called.
-    fn add_system_command<S: Into<String>, M: 'static>(
+    fn add_command_named<S: Into<String>, M: 'static>(
         &mut self,
         string: S,
         system: impl IntoSystem<(), (), M> + Send + Sync + 'static,
@@ -47,34 +63,43 @@ impl ConsoleAppExt for App {
         self
     }
 
+    fn add_command_piped<M: 'static, F>(&mut self, system: F) -> &mut Self
+    where
+        F: IntoSystem<In<Vec<String>>, (), M> + Send + Sync + 'static,
+    {
+        let name = short_type_name::<F>();
+        self.add_command_piped_named(name, system);
+        self
+    }
+
     /// Runs the given system when the command is called.
     /// The system requires that it accept ```In<Vec<String>>``` in addition to its other arguements
     /// ```
     /// fn my_epic_system(In(arguements): In<Vec<String>>, mut commands: Commands, query: Query<&mut EpicComponenet>) {}
-    fn add_system_piped_command<S: Into<String>, M: 'static>(
+    fn add_command_piped_named<S: Into<String>, M: 'static>(
         &mut self,
-        string: S,
+        name: S,
         system: impl IntoSystem<In<Vec<String>>, (), M> + Send + Sync + 'static,
     ) -> &mut Self {
         let world = self.world_mut();
         let system = world.register_system(system);
-        world.spawn((Command(string.into()), CommandExec::system_piped(system)));
+        world.spawn((Command(name.into()), CommandExec::system_piped(system)));
         self
     }
 
     /// Add a command which is called by the event type name and
     /// calls the events default implementation
-    fn add_event<E>(&mut self) -> &mut Self
+    fn add_command_event<E>(&mut self) -> &mut Self
     where
         E: Event + Default + Clone,
         for<'a> E::Trigger<'a>: Default,
     {
         let name = short_type_name::<E>();
-        self.add_event_command(name, E::default());
+        self.add_command_event_named(name, E::default());
         self
     }
 
-    fn add_event_command<S, E>(&mut self, string: S, event: E) -> &mut Self
+    fn add_command_event_named<S, E>(&mut self, string: S, event: E) -> &mut Self
     where
         S: Into<String>,
         E: Event + Clone,
@@ -85,13 +110,13 @@ impl ConsoleAppExt for App {
         self
     }
 
-    fn add_message<M: Message + Default + Clone>(&mut self) -> &mut Self {
+    fn add_command_message<M: Message + Default + Clone>(&mut self) -> &mut Self {
         let name = short_type_name::<M>();
-        self.add_message_command(name, M::default());
+        self.add_command_message_named(name, M::default());
         self
     }
 
-    fn add_message_command<S: Into<String>, M: Message + Clone>(
+    fn add_command_message_named<S: Into<String>, M: Message + Clone>(
         &mut self,
         string: S,
         message: M,
