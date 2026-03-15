@@ -1,5 +1,14 @@
-use crate::ui::input::TryCommand;
 use bevy::{ecs::system::SystemId, prelude::*};
+
+/// Text submitted from TextInputBox
+#[derive(Event)]
+pub struct TryCommand(pub Vec<String>);
+
+impl TryCommand {
+    pub fn from_entry(string: String) -> Self {
+        TryCommand(string.split_whitespace().map(String::from).collect())
+    }
+}
 
 pub fn try_command(
     trigger: On<TryCommand>,
@@ -10,8 +19,11 @@ pub fn try_command(
         return;
     };
 
+    let mut found = 0;
+
     for (command, exec) in query {
         if input == command.0.as_str() {
+            found += 1;
             match exec {
                 CommandExec::System(id) => commands.run_system(id.clone()),
                 CommandExec::SystemPiped(id) => {
@@ -26,6 +38,11 @@ pub fn try_command(
                 ),
             }
         }
+    }
+    match found {
+        0 => warn!("The command {} was not found.", input),
+        1 => {}
+        _ => warn!("{} commands have been triggered", found),
     }
 }
 

@@ -11,8 +11,9 @@ fn main() {
             ConsolePlugin,
         ))
         .add_systems(Startup, spawn_camera)
-        .add_command_named("67", special)
-        .add_command_event::<Special>()
+        .add_command_named("strange", special)
+        .add_command_named("strange", || simple!("This is the second strange command."))
+        .add_command_event(Special)
         .add_observer(on_special)
         .run();
 }

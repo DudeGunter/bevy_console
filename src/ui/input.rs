@@ -1,3 +1,4 @@
+use crate::commands::TryCommand;
 use bevy::{
     ecs::{lifecycle::HookContext, system::SystemParam, world::DeferredWorld},
     input::keyboard::{Key, KeyboardInput},
@@ -27,16 +28,6 @@ impl TextInputBox {
             .entity(parent)
             .observe(select_text_input_box)
             .observe(unselect_text_input_box);
-    }
-}
-
-/// Text submitted from TextInputBox
-#[derive(Event)]
-pub struct TryCommand(pub Vec<String>);
-
-impl TryCommand {
-    pub fn from_entry(string: String) -> Self {
-        TryCommand(string.split_whitespace().map(String::from).collect())
     }
 }
 

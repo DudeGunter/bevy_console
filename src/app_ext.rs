@@ -22,7 +22,7 @@ pub trait ConsoleAppExt {
         system: impl IntoSystem<In<Vec<String>>, (), M> + Send + Sync + 'static,
     ) -> &mut Self;
 
-    fn add_command_event<E>(&mut self) -> &mut Self
+    fn add_command_event<E>(&mut self, event: E) -> &mut Self
     where
         E: Event + Default + Clone,
         for<'a> E::Trigger<'a>: Default;
@@ -89,13 +89,13 @@ impl ConsoleAppExt for App {
 
     /// Add a command which is called by the event type name and
     /// calls the events default implementation
-    fn add_command_event<E>(&mut self) -> &mut Self
+    fn add_command_event<E>(&mut self, event: E) -> &mut Self
     where
-        E: Event + Default + Clone,
+        E: Event + Clone,
         for<'a> E::Trigger<'a>: Default,
     {
         let name = short_type_name::<E>();
-        self.add_command_event_named(name, E::default());
+        self.add_command_event_named(name, event);
         self
     }
 
