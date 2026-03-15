@@ -115,7 +115,6 @@ fn is_printable_char(chr: char) -> bool {
 
 /// Checks if any box is selected.
 #[derive(SystemParam)]
-// The docs say that the lifetimes are needed (idc why)
 pub struct SelectedBoxCheck<'w, 's> {
     select_check: Query<'w, 's, Entity, With<crate::ui::input::SelectedBox>>,
 }

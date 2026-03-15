@@ -81,14 +81,6 @@ pub fn handle_custom_messages(
 pub struct CustomMessage(Vec<Span>);
 
 impl CustomMessage {
-    /// Redundent, use the simple! macro
-    pub fn _simple<S: Into<String>>(text: S) -> Self {
-        Self(vec![Span {
-            text: text.into(),
-            ..default()
-        }])
-    }
-
     pub fn bundle(&self, commands: &mut Commands) -> Entity {
         let mut span_entities: Vec<Entity> = Vec::new();
         for span in self.iter() {
