@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.18", default-features = false, features = ["ui_api", "bevy_text", "ui_picking"] }
+bevy = { version = "0.18", default-features = false }
 crossbeam = "0.8"
 chrono = "0.4"
 
@@ -17,3 +17,6 @@ tracing = { version = "0.1", features = [
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
+
+[dev-dependencies]
+bevy = { version = "0.18", default-features = false, features = ["2d", "ui"]}

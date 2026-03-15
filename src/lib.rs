@@ -1,13 +1,10 @@
-use crate::commands::{CommandMetadata, ConsoleCommands};
-use bevy::{ecs::system::SystemId, platform::collections::HashMap, prelude::*};
+use bevy::prelude::*;
 
+mod app_ext;
 mod commands;
-mod input;
+mod default_commands;
 mod logging;
-mod message;
-mod parser;
 mod ui;
-// todo! the file structure could be more conservative
 
 /// The Plugin that implements the log reading functionality for the
 /// developer console via [`LogPlugin::custom_layer`](bevy::log::LogPlugin::custom_layer).
@@ -28,94 +25,29 @@ pub struct ConsolePlugin;
 
 impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<Console>();
-        app.add_systems(Startup, (ui::create_ui, commands::collect_commands));
+        app.add_systems(Startup, ui::create_ui);
         app.add_systems(
             Update,
             (
-                input::handle_selected_boxes,
-                message::receive_traced_message,
-                open_close_console,
+                ui::input::handle_selected_boxes,
+                ui::message::receive_traced_message,
+                ui::open_close_console,
             ),
         );
-        app.add_observer(commands::run_submitted_commands);
-        app.add_observer(message::handle_custom_messages);
+        app.add_observer(commands::try_command);
+        app.add_observer(ui::message::handle_custom_messages);
 
-        // Default commands
-        app.insert_command_with_metadata(
-            "help",
-            CommandMetadata {
-                description: "Display helpful information about different commands".to_string(),
-                usage: "help".to_string(),
-            },
-            commands::help::help,
-        );
-        app.insert_command("clear", commands::clear::clear);
-        app.insert_command("quit", commands::quit::quit);
-        app.insert_command("debug_click", commands::click::debug_click);
-        app.add_observer(commands::click::debug_click_observer);
-    }
-}
-
-/// Console configuration resource
-/// Houses the command references
-#[derive(Resource)]
-pub struct Console {
-    pub open_close_key: KeyCode,
-    // this shouldn't be edited (probably idk) manually
-    pub(crate) commands: HashMap<String, (Option<CommandMetadata>, SystemId<In<String>>)>,
-}
-
-impl Default for Console {
-    fn default() -> Self {
-        Self {
-            open_close_key: KeyCode::KeyT,
-            commands: HashMap::default(),
-        }
-    }
-}
-
-impl Console {
-    pub fn get_commands(&self) -> Vec<&String> {
-        self.commands.keys().collect()
-    }
-
-    pub fn get_metadata(&self, command: &str) -> Option<CommandMetadata> {
-        self.commands
-            .get(command)
-            .map(|(metadata, _)| metadata)
-            .unwrap_or(&None)
-            .clone()
-    }
-}
-
-pub fn open_close_console(
-    config: Res<Console>,
-    input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Visibility, With<crate::ui::ConsoleUI>>,
-    select_check: crate::input::SelectedBoxCheck,
-) {
-    if !select_check.any_selected() {
-        // If a box is selected, don't open/close the console (key protection)
-        return;
-    }
-
-    if input.just_pressed(config.open_close_key) {
-        if let Ok(mut visibility) = query.single_mut() {
-            *visibility = match *visibility {
-                Visibility::Hidden => Visibility::Visible,
-                Visibility::Visible => Visibility::Hidden,
-                _ => Visibility::Hidden,
-            };
-        }
+        use app_ext::*;
+        use default_commands::*;
+        app.add_system_command("clear", clear);
+        app.add_system_command("help", help);
+        app.add_system_command("quit", quit);
     }
 }
 
 pub mod prelude {
-    pub use crate::Console;
     pub use crate::ConsolePlugin;
-    pub use crate::commands::CommandMetadata;
-    pub use crate::commands::ConsoleCommands;
+    pub use crate::app_ext::*;
     pub use crate::logging::custom_log_layer;
     pub use crate::simple;
     pub use bevy::log::LogPlugin;
@@ -125,7 +57,7 @@ pub mod prelude {
     use std::fmt::Debug;
     /// A command function which
     /// simple prints out a the resource
-    pub fn debug_resource<R: Resource + Debug>(_: In<String>, resource: Res<R>) {
+    pub fn debug_resource<R: Resource + Debug>(resource: Res<R>) {
         simple!("{:?}", resource);
     }
 }

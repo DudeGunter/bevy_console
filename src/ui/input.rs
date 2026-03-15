@@ -31,9 +31,13 @@ impl TextInputBox {
 }
 
 /// Text submitted from TextInputBox
-#[derive(Event, Clone, Debug)]
-pub struct SubmittedText {
-    pub text: String,
+#[derive(Event)]
+pub struct TryCommand(pub Vec<String>);
+
+impl TryCommand {
+    pub fn from_entry(string: String) -> Self {
+        TryCommand(string.split_whitespace().map(String::from).collect())
+    }
 }
 
 /// Marker component for selected text input boxes.
@@ -76,9 +80,7 @@ pub fn handle_selected_boxes(
             }
             match (&input.logical_key, &input.text) {
                 (Key::Enter, _) => {
-                    commands.trigger(SubmittedText {
-                        text: text.0.clone(),
-                    });
+                    commands.trigger(TryCommand::from_entry(text.0.clone()));
                     if config.clear_on_submit {
                         text.clear();
                     }
@@ -115,7 +117,7 @@ fn is_printable_char(chr: char) -> bool {
 #[derive(SystemParam)]
 // The docs say that the lifetimes are needed (idc why)
 pub struct SelectedBoxCheck<'w, 's> {
-    select_check: Query<'w, 's, Entity, With<crate::input::SelectedBox>>,
+    select_check: Query<'w, 's, Entity, With<crate::ui::input::SelectedBox>>,
 }
 
 impl<'w, 's> SelectedBoxCheck<'w, 's> {

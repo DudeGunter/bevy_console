@@ -1,5 +1,8 @@
-use crate::input::*;
+use crate::ui::input::*;
 use bevy::prelude::*;
+
+pub mod input;
+pub mod message;
 
 pub const CONSOLE_FONT_SIZE: f32 = 12.0;
 
@@ -10,6 +13,27 @@ pub struct ConsoleUI;
 /// This could be branched off into a separate crate/component
 #[derive(Component)]
 pub struct DragData(Vec2);
+
+pub fn open_close_console(
+    input: Res<ButtonInput<KeyCode>>,
+    mut query: Query<&mut Visibility, With<crate::ui::ConsoleUI>>,
+    select_check: SelectedBoxCheck,
+) {
+    if !select_check.any_selected() {
+        // If a box is selected, don't open/close the console (key protection)
+        return;
+    }
+
+    if input.just_pressed(KeyCode::KeyT) {
+        if let Ok(mut visibility) = query.single_mut() {
+            *visibility = match *visibility {
+                Visibility::Hidden => Visibility::Visible,
+                Visibility::Visible => Visibility::Hidden,
+                _ => Visibility::Hidden,
+            };
+        }
+    }
+}
 
 pub fn create_ui(mut commands: Commands) {
     commands

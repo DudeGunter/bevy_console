@@ -11,7 +11,7 @@ fn main() {
             ConsolePlugin,
         ))
         .add_systems(Startup, spawn_camera)
-        .insert_command("67", special)
+        .add_system_command("67", special)
         .run();
 }
 
@@ -23,7 +23,7 @@ fn spawn_camera(mut commands: Commands) {
     ));
 }
 
-fn special(_: In<String>, query: Query<Entity>) {
+fn special(query: Query<Entity>) {
     simple!("67");
     simple!("There are {} entities", query.iter().count());
 }

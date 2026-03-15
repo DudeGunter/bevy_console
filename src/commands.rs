@@ -1,100 +1,102 @@
-use crate::{Console, input::SubmittedText};
+use crate::ui::input::TryCommand;
 use bevy::{ecs::system::SystemId, prelude::*};
 
-pub mod clear;
-pub mod click;
-pub mod help;
-pub mod quit;
+pub fn try_command(
+    trigger: On<TryCommand>,
+    mut commands: Commands,
+    query: Query<(&Command, &CommandExec)>,
+) {
+    let Some(input) = trigger.0.first() else {
+        return;
+    };
 
-#[derive(Component)]
-pub struct CommandToCollect {
-    name: String,
-    metadata: Option<CommandMetadata>,
-    system: SystemId<In<String>>,
+    for (command, exec) in query {
+        if input == command.0.as_str() {
+            match exec {
+                CommandExec::System(id) => commands.run_system(id.clone()),
+                CommandExec::SystemPiped(id) => {
+                    let mut args = trigger.0.clone();
+                    args.remove(0);
+                    commands.run_system_with(id.clone(), args);
+                }
+                CommandExec::Deferred(deferred) => deferred.fire(&mut commands),
+                CommandExec::None => warn!(
+                    "The command {} does not execute anything. Insert the component CommandExec to add functionality.",
+                    command.0
+                ),
+            }
+        }
+    }
 }
 
-#[derive(Reflect, Clone)]
+#[derive(Component, Reflect, Clone)]
 pub struct CommandMetadata {
     pub description: String,
-    // todo! decide wether to make this a struct with a patern of some sort with
-    // integrated parsing (if that make sense) possible use clap?
     pub usage: String,
 }
 
-pub trait ConsoleCommands {
-    #![allow(unused)]
-    fn insert_command<S: Into<String>, M: 'static>(
-        &mut self,
-        name: S,
-        system: impl IntoSystem<In<String>, (), M> + Send + Sync + 'static,
-    ) -> &mut Self;
+#[derive(Component, Reflect, Clone, PartialEq, Eq)]
+#[require(CommandExec)]
+pub struct Command(pub String);
 
-    fn insert_command_with_metadata<T: Into<String>, M: 'static>(
-        &mut self,
-        name: T,
-        command: CommandMetadata,
-        system: impl IntoSystem<In<String>, (), M> + Send + Sync + 'static,
-    ) -> &mut Self;
+#[derive(Component, Default)]
+pub enum CommandExec {
+    System(SystemId),
+    SystemPiped(SystemId<In<Vec<String>>>),
+    Deferred(DeferredCommand),
+    #[default]
+    None,
 }
 
-impl ConsoleCommands for App {
-    fn insert_command<S: Into<String>, M: 'static>(
-        &mut self,
-        name: S,
-        system: impl IntoSystem<In<String>, (), M> + Send + Sync + 'static,
-    ) -> &mut Self {
-        let world = self.world_mut();
-        let system = world.register_system(system);
-        // Instead, we spawn a component to be collected on startup
-        world.spawn(CommandToCollect {
-            name: name.into(),
-            metadata: None,
-            system,
-        });
-        self
+impl CommandExec {
+    pub fn system(id: SystemId) -> Self {
+        Self::System(id)
     }
 
-    fn insert_command_with_metadata<T: Into<String>, M: 'static>(
-        &mut self,
-        name: T,
-        command: CommandMetadata,
-        system: impl IntoSystem<In<String>, (), M> + Send + Sync + 'static,
-    ) -> &mut Self {
-        let world = self.world_mut();
-        let system = world.register_system(system);
-        // Instead, we spawn a component to be collected on startup
-        world.spawn(CommandToCollect {
-            name: name.into(),
-            metadata: Some(command),
-            system,
-        });
-        self
+    pub fn system_piped(id: SystemId<In<Vec<String>>>) -> Self {
+        Self::SystemPiped(id)
+    }
+
+    pub fn event<E: Event + Clone>(event: E) -> Self
+    where
+        for<'a> E::Trigger<'a>: Default,
+    {
+        Self::Deferred(DeferredCommand::event(event))
+    }
+
+    pub fn message<M: Message + Clone>(message: M) -> Self {
+        Self::Deferred(DeferredCommand::message(message))
     }
 }
 
-pub fn collect_commands(
-    mut commands: bevy::prelude::Commands,
-    mut console: ResMut<Console>,
-    query: Query<(Entity, &CommandToCollect)>,
-) {
-    for (entity, command) in query.iter() {
-        commands.entity(entity).despawn();
-        console.commands.insert(
-            command.name.clone(),
-            (command.metadata.clone(), command.system),
-        );
-    }
+pub struct DeferredCommand {
+    trigger: Box<dyn Fn(&mut Commands) + Send + Sync>,
 }
 
-pub fn run_submitted_commands(
-    on: On<SubmittedText>,
-    mut commands: bevy::prelude::Commands,
-    console: Res<Console>,
-) {
-    let (command_name, arguments) = on.text.split_once(' ').unwrap_or((on.text.as_str(), ""));
-    if let Some((_command, system)) = console.commands.get(command_name) {
-        commands.run_system_with(*system, arguments.to_string());
-    } else {
-        warn!("Command not found: {}", command_name);
+impl DeferredCommand {
+    pub fn event<E: Event + Clone>(event: E) -> Self
+    where
+        for<'a> E::Trigger<'a>: Default,
+    {
+        Self {
+            trigger: Box::new(move |commands: &mut Commands| {
+                commands.trigger(event.clone());
+            }),
+        }
+    }
+
+    pub fn message<M: Message + Clone>(message: M) -> Self {
+        Self {
+            trigger: Box::new(move |commands: &mut Commands| {
+                let message = message.clone();
+                commands.run_system_cached(move |mut writer: MessageWriter<M>| {
+                    writer.write(message.clone());
+                });
+            }),
+        }
+    }
+
+    pub fn fire(&self, commands: &mut Commands) {
+        (self.trigger)(commands);
     }
 }
