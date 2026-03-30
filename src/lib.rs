@@ -48,6 +48,7 @@ impl Plugin for ConsolePlugin {
         {
             use app_ext::*;
             use default_commands::*;
+            #[cfg(feature = "ui")]
             app.add_command(clear);
             app.add_command(help);
             app.add_command(quit);

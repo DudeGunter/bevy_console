@@ -1,7 +1,9 @@
-use crate::{commands::Command, simple, ui::message::ConsoleMessage};
+use crate::{commands::Command, simple};
 use bevy::prelude::*;
 
+#[cfg(feature = "ui")]
 pub fn clear(mut commands: Commands, query: Query<Entity, With<ConsoleMessage>>) {
+    use crate::ui::message::ConsoleMessage;
     for entity in query {
         commands.entity(entity).despawn();
     }

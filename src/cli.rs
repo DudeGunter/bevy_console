@@ -17,7 +17,7 @@ pub fn receive_cli_inputs(mut commands: Commands, mut receiver: Local<Option<Rec
                 let mut rl = DefaultEditor::new().expect("Failed to create editor");
 
                 loop {
-                    match rl.readline("> ") {
+                    match rl.readline("") {
                         Ok(line) => {
                             let trimmed = line.trim().to_string();
                             if trimmed.is_empty() {
