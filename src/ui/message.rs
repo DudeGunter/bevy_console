@@ -119,13 +119,3 @@ impl Span {
         )
     }
 }
-
-#[macro_export]
-macro_rules! simple {
-    ($msg:expr) => {
-        $crate::prelude::tracing::info!(custom = true, $msg);
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        $crate::prelude::tracing::info!(custom = true, $fmt, $($arg)*);
-    };
-}

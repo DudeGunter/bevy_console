@@ -3,10 +3,18 @@ name = "bevy_console"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["logging"]
+cli = ["dep:rustyline"]
+ui = ["bevy/ui"]
+logging = ["bevy/bevy_log", "bevy/bevy_color"]
+default_commands = []
+
 [dependencies]
 bevy = { version = "0.18", default-features = false }
 crossbeam = "0.8"
 chrono = "0.4"
+rustyline = { version = "18", optional = true }
 
 tracing = { version = "0.1", features = [
     "max_level_debug",
@@ -17,6 +25,9 @@ tracing = { version = "0.1", features = [
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
+required-features = ["ui", "default_commands"]
 
-[dev-dependencies]
-bevy = { version = "0.18", default-features = false, features = ["2d", "ui"]}
+[[example]]
+name = "cli"
+path = "examples/cli.rs"
+required-features = ["cli", "default_commands"]
