@@ -5,7 +5,7 @@ use bevy::{
     prelude::*,
 };
 
-#[derive(Component, Reflect, Debug)]
+#[derive(Component, Reflect, Debug, Clone)]
 #[component(on_add = Self::on_add)]
 #[require(Node, Text)]
 pub struct TextInputBox {
