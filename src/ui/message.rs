@@ -4,13 +4,22 @@ use crate::{
 };
 use bevy::{
     color::palettes::{css::*, tailwind::*},
+    feathers::{controls::FeathersListRow, theme::ThemedText},
     prelude::*,
 };
 
-pub const DEFAULT_CONSOLE_FONT_COLOR: Color = Color::Srgba(WHITE_SMOKE);
-
-#[derive(Component)]
+#[derive(SceneComponent, Clone, Copy, Default)]
 pub struct ConsoleMessage;
+
+impl ConsoleMessage {
+    fn scene() -> impl Scene {
+        bsn! {
+            @FeathersListRow
+            ThemedText
+            Text
+        }
+    }
+}
 
 pub fn receive_traced_message(
     mut commands: Commands,
@@ -28,24 +37,17 @@ pub fn receive_traced_message(
                 let path = span(trace.target + ": ", BLUE_600);
                 let message = span(trace.message, WHITE_SMOKE);
                 let message = commands
-                    .spawn((
-                        ConsoleMessage,
-                        Text::default(),
-                        Node::default(),
-                        children![time, info, path, message],
-                    ))
+                    .spawn_scene(bsn! {
+                        @ConsoleMessage
+                        Children [time, info, path, message]
+                    })
                     .id();
                 new_messages.push(message);
             } else {
                 let message = commands
-                    .spawn((
-                        (ConsoleMessage, Text::from(trace.message)),
-                        TextColor(DEFAULT_CONSOLE_FONT_COLOR),
-                        TextFont {
-                            font_size: crate::ui::CONSOLE_FONT_SIZE,
-                            ..default()
-                        },
-                    ))
+                    .spawn_scene(bsn! {
+                        @ConsoleMessage Text({trace.message})
+                    })
                     .id();
                 new_messages.push(message);
             }
@@ -54,69 +56,14 @@ pub fn receive_traced_message(
     }
 }
 
-pub fn span<S: Into<String>, C: Into<Color>>(string: S, color: C) -> impl Bundle {
-    (
-        TextSpan::new(string.into()),
-        TextColor(color.into()),
-        TextFont {
-            font_size: crate::ui::CONSOLE_FONT_SIZE,
-            ..default()
-        },
-    )
-}
-
-pub fn handle_custom_messages(
-    trigger: On<CustomMessage>,
-    mut commands: Commands,
-    container: Query<Entity, With<MessageContainer>>,
-) {
-    if let Ok(entity) = container.single() {
-        let message = trigger.bundle(&mut commands);
-        commands.entity(entity).add_child(message);
-    }
-}
-
-// High level control over the messages
-#[derive(Event, Deref, DerefMut)]
-pub struct CustomMessage(Vec<Span>);
-
-impl CustomMessage {
-    pub fn bundle(&self, commands: &mut Commands) -> Entity {
-        let mut span_entities: Vec<Entity> = Vec::new();
-        for span in self.iter() {
-            span_entities.push(commands.spawn(span.bundle()).id());
-        }
-        commands
-            .spawn((ConsoleMessage, Text::default(), Node::default()))
-            .add_children(span_entities.as_slice())
-            .id()
-    }
-}
-
-pub struct Span {
-    text: String,
-    color: Color,
-}
-
-impl Default for Span {
-    fn default() -> Self {
-        Self {
-            text: String::new(),
-            color: DEFAULT_CONSOLE_FONT_COLOR,
-        }
-    }
-}
-
-impl Span {
-    pub fn bundle(&self) -> impl Bundle {
-        (
-            TextSpan::new(self.text.clone()),
-            TextColor(self.color.clone()),
-            TextFont {
-                font_size: crate::ui::CONSOLE_FONT_SIZE,
-                ..default()
-            },
-        )
+pub fn span<S: Into<String> + Send + Sync + 'static, C: Into<Color>>(
+    string: S,
+    color: C,
+) -> impl Scene {
+    bsn! {
+        TextSpan::new(string)
+        TextColor(color)
+        ThemedText
     }
 }
 

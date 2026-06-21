@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme},
+    prelude::*,
+};
 
 mod app_ext;
 mod commands;
@@ -25,7 +28,9 @@ pub struct ConsolePlugin;
 
 impl Plugin for ConsolePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, ui::create_ui);
+        app.add_plugins(FeathersPlugins);
+        app.insert_resource(UiTheme(create_dark_theme()));
+        app.add_systems(Startup, ui::spawn_ui);
         app.add_systems(
             Update,
             (
@@ -35,7 +40,6 @@ impl Plugin for ConsolePlugin {
             ),
         );
         app.add_observer(commands::try_command);
-        app.add_observer(ui::message::handle_custom_messages);
 
         use app_ext::*;
         use default_commands::*;
