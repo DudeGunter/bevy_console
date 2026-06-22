@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{core_pipeline::tonemapping::Tonemapping, prelude::*};
 use bevy_console::prelude::*;
 
 fn main() {
@@ -22,6 +22,7 @@ fn spawn_camera(mut commands: Commands) {
     info!("Basic example, spawning scene");
     commands.spawn((
         Camera3d::default(),
+        Tonemapping::AcesFitted,
         Transform::default().looking_at(Vec3::new(10.0, 0.0, 0.0), Vec3::Y),
     ));
 }

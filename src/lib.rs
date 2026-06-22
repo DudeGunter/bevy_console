@@ -34,7 +34,7 @@ impl Plugin for ConsolePlugin {
         app.add_systems(
             Update,
             (
-                ui::input::handle_selected_boxes,
+                ui::input::handle_text_input,
                 ui::message::receive_traced_message,
                 ui::open_close_console,
             ),

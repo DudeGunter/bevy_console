@@ -4,8 +4,10 @@ use crate::{
 };
 use bevy::{
     color::palettes::{css::*, tailwind::*},
-    feathers::{controls::FeathersListRow, theme::ThemedText},
+    feathers::{font_styles::InheritableFont, theme::ThemedText},
+    picking::hover::Hovered,
     prelude::*,
+    ui_widgets::ListItem,
 };
 
 #[derive(SceneComponent, Clone, Copy, Default)]
@@ -14,9 +16,14 @@ pub struct ConsoleMessage;
 impl ConsoleMessage {
     fn scene() -> impl Scene {
         bsn! {
-            @FeathersListRow
+            Hovered
+            ListItem
             ThemedText
             Text
+            InheritableFont {
+                font_size: FontSize::Px(14.0),
+                weight: FontWeight::NORMAL,
+            }
         }
     }
 }
@@ -46,7 +53,7 @@ pub fn receive_traced_message(
             } else {
                 let message = commands
                     .spawn_scene(bsn! {
-                        @ConsoleMessage Text({trace.message})
+                        @ConsoleMessage Children [ Text({trace.message}) ThemedText ]
                     })
                     .id();
                 new_messages.push(message);
@@ -62,8 +69,8 @@ pub fn span<S: Into<String> + Send + Sync + 'static, C: Into<Color>>(
 ) -> impl Scene {
     bsn! {
         TextSpan::new(string)
-        TextColor(color)
         ThemedText
+        TextColor(color)
     }
 }
 
