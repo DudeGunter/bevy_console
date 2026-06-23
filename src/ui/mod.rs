@@ -2,12 +2,12 @@ use crate::ui::input::*;
 use bevy::{
     feathers::{
         containers::{subpane, subpane_body, subpane_header},
-        controls::{FeathersScrollbar, FeathersTextInput},
+        controls::{FeathersTextInput, FeathersTextInputContainer},
         theme::ThemedText,
     },
     input_focus::tab_navigation::TabIndex,
     prelude::*,
-    ui_widgets::{ControlOrientation, ListBox, ScrollArea},
+    ui_widgets::{ListBox, ScrollArea},
 };
 
 pub mod input;
@@ -39,7 +39,6 @@ pub fn open_close_console(
 // new with feathers!
 pub fn spawn_ui(mut commands: Commands) {
     commands.spawn_scene(bsn! {
-
         #Console
         ConsoleUI
         DragData
@@ -51,44 +50,25 @@ pub fn spawn_ui(mut commands: Commands) {
                 (
                     #Container
                     MessageContainer
-                    Node {
-                        width: percent(100),
-                        max_height: px(140),
-                        flex_grow: 0.5, // Expand to fill space
-                        flex_direction: FlexDirection::Column,
-                        overflow: Overflow::clip_y(),
-                    }
                     ListBox
                     TabIndex(0)
-                    Children [
-                        (
-                            #inner
-                            MessageContainerInner
-                            Node {
-                                display: Display::Flex,
-                                flex_direction: FlexDirection::ColumnReverse,
-                                align_items: AlignItems::Stretch,
-                                justify_content: JustifyContent::Start,
-                                overflow: Overflow::scroll_y(),
-                            }
-                            ScrollArea
-                        ),
-                        @FeathersScrollbar {
-                            @target: #inner,
-                            @orientation: {ControlOrientation::Vertical},
-                        }
-                        Node {
-                            position_type: PositionType::Absolute,
-                            right: px(0),
-                            top: px(0),
-                            bottom: px(0),
-                            width: px(6),
-                        }
-                    ]
+                    ScrollArea
+                    Node {
+                        width: px(600),
+                        height: px(300),
+                        display: Display::Flex,
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::Stretch,
+                        justify_content: JustifyContent::FlexEnd,
+                        overflow: Overflow::scroll_y(),
+                    }
                 ),
                 #TextInput
-                @FeathersTextInput
-                TextInput
+                @FeathersTextInputContainer
+                Children [
+                    @FeathersTextInput
+                    TextInput
+                ],
             ],
         ]
         on(|on_drag_start: On<Pointer<DragStart>>,
@@ -129,6 +109,3 @@ pub fn spawn_ui(mut commands: Commands) {
 #[derive(Component, Default, Clone, Reflect)]
 #[reflect(Component, Clone, Default)]
 pub struct MessageContainer;
-
-#[derive(Component, Default, Clone, Reflect)]
-pub struct MessageContainerInner;
