@@ -5,7 +5,7 @@ use bevy::{
         controls::{FeathersTextInput, FeathersTextInputContainer},
         theme::ThemedText,
     },
-    input_focus::tab_navigation::TabIndex,
+    input_focus::{InputFocus, tab_navigation::TabIndex},
     prelude::*,
     ui_widgets::{ListBox, ScrollArea},
 };
@@ -22,9 +22,14 @@ pub struct ConsoleUI;
 pub struct DragData(Vec2);
 
 pub fn open_close_console(
+    input_focus: Res<InputFocus>,
     input: Res<ButtonInput<KeyCode>>,
     mut query: Query<&mut Visibility, With<crate::ui::ConsoleUI>>,
 ) {
+    if input_focus.get().is_some() {
+        return;
+    }
+
     if input.just_pressed(KeyCode::KeyT) {
         if let Ok(mut visibility) = query.single_mut() {
             *visibility = match *visibility {
@@ -59,8 +64,8 @@ pub fn spawn_ui(mut commands: Commands) {
                         display: Display::Flex,
                         flex_direction: FlexDirection::Column,
                         align_items: AlignItems::Stretch,
-                        justify_content: JustifyContent::FlexEnd,
-                        overflow: Overflow::scroll_y(),
+                        justify_content: JustifyContent::FlexStart,
+                        overflow: Overflow::scroll(),
                     }
                 ),
                 #TextInput

@@ -31,12 +31,14 @@ impl ConsoleMessage {
 
 pub fn receive_traced_message(
     mut commands: Commands,
-    container: Query<Entity, With<MessageContainer>>,
+    container: Query<(Entity, &mut ScrollPosition), With<MessageContainer>>,
     traced_messages: ResMut<TracingReceiver>,
 ) {
-    if let Ok(entity) = container.single_inner() {
+    if let Ok((entity, mut scroll_position)) = container.single_inner() {
         let mut new_messages: Vec<Entity> = Vec::new();
+        let mut message_received = false;
         while let Ok(trace) = traced_messages.try_recv() {
+            message_received = true;
             if !trace.custom {
                 let time = trace.time.time().to_string(); // todo! (not really) this formatting could be done better via chronos
                 let formatted_time = &time[..time.len() - 7];
@@ -61,6 +63,9 @@ pub fn receive_traced_message(
             }
         }
         commands.entity(entity).add_children(&new_messages);
+        if message_received {
+            scroll_position.0.y = f32::MAX;
+        }
     }
 }
 
