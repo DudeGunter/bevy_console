@@ -1,6 +1,6 @@
 use crate::{
     logging::{GetColor, TracingReceiver},
-    ui::MessageContainer,
+    ui::{MessageContainer, MessageContainerInner},
 };
 use bevy::{
     color::palettes::{css::*, tailwind::*},
@@ -30,7 +30,7 @@ impl ConsoleMessage {
 
 pub fn receive_traced_message(
     mut commands: Commands,
-    container: Query<Entity, With<MessageContainer>>,
+    container: Query<Entity, With<MessageContainerInner>>,
     traced_messages: ResMut<TracingReceiver>,
 ) {
     if let Ok(entity) = container.single_inner() {
