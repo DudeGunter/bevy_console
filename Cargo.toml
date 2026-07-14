@@ -8,12 +8,6 @@ bevy = { version = "0.19", default-features = false, features = ["bevy_feathers"
 crossbeam = "0.8"
 chrono = "0.4"
 
-tracing = { version = "0.1", features = [
-    "max_level_debug",
-    "release_max_level_warn",
-] }
-
-
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
