@@ -566,7 +566,6 @@ dependencies = [
  "bevy",
  "chrono",
  "crossbeam",
- "tracing",
 ]
 
 [[package]]
