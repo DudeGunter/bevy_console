@@ -7,12 +7,14 @@ use bevy::{
     },
     input_focus::{InputFocus, tab_navigation::TabIndex},
     prelude::*,
+    text::EditableText,
     ui_widgets::{ListBox, ScrollArea},
 };
 
 pub mod input;
 pub mod message;
 
+/// The root of the console. Its [`Visibility`] opens and closes the console.
 #[derive(Component, Clone, Default)]
 pub struct ConsoleUI;
 
@@ -24,21 +26,25 @@ pub struct DragData(Vec2);
 pub fn open_close_console(
     input_focus: Res<InputFocus>,
     input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Visibility, With<crate::ui::ConsoleUI>>,
+    text_inputs: Query<(), With<EditableText>>,
+    mut visibility: Single<&mut Visibility, With<ConsoleUI>>,
 ) {
-    if input_focus.get().is_some() {
+    if !input.just_pressed(KeyCode::KeyT) {
         return;
     }
 
-    if input.just_pressed(KeyCode::KeyT) {
-        if let Ok(mut visibility) = query.single_mut() {
-            *visibility = match *visibility {
-                Visibility::Hidden => Visibility::Visible,
-                Visibility::Visible => Visibility::Hidden,
-                _ => Visibility::Hidden,
-            };
-        }
+    // Only typing matters. Something else usually has the focus, like the primary window.
+    if input_focus
+        .get()
+        .is_some_and(|focused| text_inputs.contains(focused))
+    {
+        return;
     }
+
+    **visibility = match **visibility {
+        Visibility::Hidden => Visibility::Visible,
+        _ => Visibility::Hidden,
+    };
 }
 
 // new with feathers!
@@ -79,20 +85,20 @@ pub fn spawn_ui(mut commands: Commands) {
         on(|on_drag_start: On<Pointer<DragStart>>,
          mut drag_query: Query<&mut DragData>,
          transform_query: Query<&UiTransform>| {
-            if let Ok(mut drag_data) = drag_query.get_mut(on_drag_start.event_target()) {
-                if let Ok(transform) = transform_query.get(on_drag_start.entity) {
-                    let current_x = match transform.translation.x {
-                        Val::Px(x) => x,
-                        _ => 0.0,
-                    };
-                    let current_y = match transform.translation.y {
-                        Val::Px(y) => y,
-                        _ => 0.0,
-                    };
-                    // Store offset: pointer position minus element position
-                    drag_data.0 = on_drag_start.pointer_location.position
-                        - Vec2::new(current_x, current_y);
-                }
+            if let Ok(mut drag_data) = drag_query.get_mut(on_drag_start.event_target())
+                && let Ok(transform) = transform_query.get(on_drag_start.entity)
+            {
+                let current_x = match transform.translation.x {
+                    Val::Px(x) => x,
+                    _ => 0.0,
+                };
+                let current_y = match transform.translation.y {
+                    Val::Px(y) => y,
+                    _ => 0.0,
+                };
+                // Store offset: pointer position minus element position
+                drag_data.0 = on_drag_start.pointer_location.position
+                    - Vec2::new(current_x, current_y);
             }
         })
         on(|on_drag: On<Pointer<Drag>>,

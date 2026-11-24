@@ -9,17 +9,17 @@ use tracing::Level;
 
 /// A function that implements the log reading functionality for the
 /// developer console via [`LogPlugin::custom_layer`](bevy::log::LogPlugin::custom_layer).
-/// ```rust
-/// # use bevy::prelude::*;
-/// fn main() {
-///     App::new()
-///         .add_plugins(DefaultPlugins.set(LogPlugin {
-///             custom_layer: custom_log_layer, // The function
-///             ..Default::default()
-///         }))
-///         .add_plugin(ConsolePlugin)
-///         .run();
-/// }
+/// ```no_run
+/// use bevy::prelude::*;
+/// use bevy_console::prelude::*;
+///
+/// App::new()
+///     .add_plugins(DefaultPlugins.set(LogPlugin {
+///         custom_layer: custom_log_layer, // The function
+///         ..default()
+///     }))
+///     .add_plugins(ConsolePlugin)
+///     .run();
 /// ```
 pub fn custom_log_layer(app: &mut App) -> Option<BoxedLayer> {
     Some(Box::new(create_custom_log_layer(app)))
@@ -80,7 +80,14 @@ struct ConsoleVisitor {
 impl tracing::field::Visit for ConsoleVisitor {
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         if field.name() == "message" {
-            self.message = format!("{:?}", value).trim_matches('"').to_string();
+            self.message = format!("{:?}", value);
+        }
+    }
+
+    // Without this, `record_debug` would surround the message with quotes and escape it.
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        if field.name() == "message" {
+            self.message = value.to_string();
         }
     }
 
@@ -104,5 +111,57 @@ impl GetColor for Level {
             Level::DEBUG => GRAY,
             Level::TRACE => DARK_GRAY,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tracing_subscriber::prelude::*;
+
+    /// Everything `log` logs, as the console would receive it.
+    fn capture(log: impl FnOnce()) -> Vec<TraceMessage> {
+        let mut app = App::new();
+        let layer = custom_log_layer(&mut app).unwrap();
+        let subscriber = tracing_subscriber::registry().with(layer);
+        tracing::subscriber::with_default(subscriber, log);
+        app.world()
+            .resource::<TracingReceiver>()
+            .try_iter()
+            .collect()
+    }
+
+    #[test]
+    fn captures_level_target_and_message() {
+        let messages = capture(|| warn!("{} left", 3));
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].level, Level::WARN);
+        assert_eq!(messages[0].target, module_path!());
+        assert_eq!(messages[0].message, "3 left");
+        assert!(!messages[0].custom);
+    }
+
+    #[test]
+    fn keeps_quotes_and_order() {
+        let messages = capture(|| {
+            info!("\"quoted\"");
+            error!(message = "a \"b\"");
+        });
+        let messages: Vec<_> = messages.iter().map(|m| m.message.as_str()).collect();
+        assert_eq!(messages, ["\"quoted\"", "a \"b\""]);
+    }
+
+    #[test]
+    fn simple_is_custom_and_works_as_an_expression() {
+        let value = 2;
+        let messages = capture(|| {
+            let log = || crate::simple!("one");
+            log();
+            crate::simple!("{value}");
+            crate::simple!("{} {}", 3, "four",);
+        });
+        assert!(messages.iter().all(|m| m.custom));
+        let messages: Vec<_> = messages.iter().map(|m| m.message.as_str()).collect();
+        assert_eq!(messages, ["one", "2", "3 four"]);
     }
 }
