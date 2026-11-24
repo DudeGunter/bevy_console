@@ -3,7 +3,12 @@
 //! Run with `cargo run --example custom_theme`. Only the newest 10 messages are kept.
 
 use bevy::{
-    feathers::{FeathersPlugins, dark_theme::create_dark_theme, theme::UiTheme, tokens},
+    feathers::{
+        FeathersPlugins,
+        dark_theme::create_dark_theme,
+        theme::{SemanticToken, UiTheme},
+        tokens,
+    },
     prelude::*,
     time::common_conditions::on_timer,
 };
@@ -12,12 +17,23 @@ use std::time::Duration;
 
 fn main() {
     let mut theme = create_dark_theme();
-    theme
-        .color
-        .insert(tokens::SUBPANE_HEADER_BG, Color::srgb(0.45, 0.1, 0.35));
-    theme
-        .color
-        .insert(tokens::SUBPANE_BODY_BG, Color::srgb(0.16, 0.06, 0.14));
+    for (token, name, color) in [
+        (
+            tokens::SUBPANE_HEADER_BG,
+            "custom.header",
+            Color::srgb(0.45, 0.1, 0.35),
+        ),
+        (
+            tokens::SUBPANE_BODY_BG,
+            "custom.body",
+            Color::srgb(0.16, 0.06, 0.14),
+        ),
+    ] {
+        // Other parts of the theme may share a semantic token, so give these their own.
+        let semantic = SemanticToken::new_static(name);
+        theme.token_assignments.insert(token, semantic.clone());
+        theme.semantic_base.insert(semantic, color);
+    }
 
     App::new()
         .add_plugins((

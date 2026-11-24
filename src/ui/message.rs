@@ -94,7 +94,7 @@ fn spawn_message(commands: &mut Commands, trace: TraceMessage) -> Entity {
     commands
         .spawn_scene(bsn! {
             @ConsoleMessage
-            Children [time, info, path, message]
+            Children [@time -- @info -- @path -- @message]
         })
         .id()
 }

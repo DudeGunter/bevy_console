@@ -18,7 +18,7 @@ pub mod message;
 #[derive(Component, Clone, Default)]
 pub struct ConsoleUI;
 
-/// Needed to handle drag events
+/// Needed to handle drag events, stores the translation from before the drag
 /// This could be branched off into a separate crate/component
 #[derive(Component, Clone, Default)]
 pub struct DragData(Vec2);
@@ -53,61 +53,52 @@ pub fn spawn_ui(mut commands: Commands) {
         #Console
         ConsoleUI
         DragData
-        subpane() Children [
-            subpane_header() Children [
-                (Text("Console") ThemedText),
-            ],
-            subpane_body() Children [
-                (
-                    #Container
-                    MessageContainer
-                    ListBox
-                    TabIndex(0)
-                    ScrollArea
-                    Node {
-                        width: px(600),
-                        height: px(300),
-                        display: Display::Flex,
-                        flex_direction: FlexDirection::Column,
-                        align_items: AlignItems::Stretch,
-                        justify_content: JustifyContent::FlexStart,
-                        overflow: Overflow::scroll(),
-                    }
-                ),
+        @subpane() Children [
+            @subpane_header() Children [
+                Text("Console") ThemedText
+            ]
+            --
+            @subpane_body() Children [
+                #Container
+                MessageContainer
+                ListBox
+                TabIndex(0)
+                ScrollArea
+                Node {
+                    width: px(600),
+                    height: px(300),
+                    display: Display::Flex,
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Stretch,
+                    justify_content: JustifyContent::FlexStart,
+                    overflow: Overflow::scroll(),
+                }
+                --
                 #TextInput
                 @FeathersTextInputContainer
                 Children [
                     @FeathersTextInput
                     TextInput
-                ],
-            ],
+                ]
+            ]
         ]
-        on(|on_drag_start: On<Pointer<DragStart>>,
-         mut drag_query: Query<&mut DragData>,
-         transform_query: Query<&UiTransform>| {
-            if let Ok(mut drag_data) = drag_query.get_mut(on_drag_start.event_target())
-                && let Ok(transform) = transform_query.get(on_drag_start.entity)
-            {
-                let current_x = match transform.translation.x {
-                    Val::Px(x) => x,
+        on(|on_drag_start: On<PointerDragStart>,
+         mut query: Query<(&mut DragData, &UiTransform)>| {
+            if let Ok((mut drag_data, transform)) = query.get_mut(on_drag_start.entity) {
+                let Val2 { x, y } = transform.translation;
+                let px = |val| match val {
+                    Val::Px(px) => px,
                     _ => 0.0,
                 };
-                let current_y = match transform.translation.y {
-                    Val::Px(y) => y,
-                    _ => 0.0,
-                };
-                // Store offset: pointer position minus element position
-                drag_data.0 = on_drag_start.pointer_location.position
-                    - Vec2::new(current_x, current_y);
+                drag_data.0 = Vec2::new(px(x), px(y));
             }
         })
-        on(|on_drag: On<Pointer<Drag>>,
-         mut query: Query<&mut UiTransform>,
-         drag_query: Query<&DragData>| {
-            if let Ok(mut transform) = query.get_mut(on_drag.event_target()) {
-                let offset = drag_query.get(on_drag.entity).unwrap();
-                // Subtract offset from pointer location
-                let new_pos = on_drag.pointer_location.position - offset.0;
+        on(|on_drag: On<PointerDrag>,
+         mut query: Query<(&DragData, &mut UiTransform)>| {
+            if let Ok((drag_data, mut transform)) = query.get_mut(on_drag.entity) {
+                // The distance is measured from where the pointer was pressed. The position of
+                // PointerDragStart isn't, as the pointer has already moved by then.
+                let new_pos = drag_data.0 + on_drag.distance;
                 transform.translation = Val2::px(new_pos.x, new_pos.y);
             }
         })

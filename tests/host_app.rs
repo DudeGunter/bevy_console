@@ -14,17 +14,18 @@ use bevy::{
 use bevy_console::prelude::*;
 use common::*;
 
+const PINK: Color = Color::srgb(1.0, 0.0, 1.0);
+
 fn pink_theme() -> UiTheme {
-    let mut props = ThemeProps::default();
-    props
-        .color
-        .insert(tokens::SUBPANE_BODY_BG, Color::srgb(1.0, 0.0, 1.0));
-    UiTheme(props)
+    UiTheme(ThemeProps::new_non_contextual(
+        [(tokens::SUBPANE_BODY_BG, PINK)].into_iter().collect(),
+    ))
 }
 
-fn theme_color(app: &App) -> Option<Color> {
-    let theme = app.world().resource::<UiTheme>();
-    theme.0.color.get(&tokens::SUBPANE_BODY_BG).copied()
+fn theme_color(app: &App) -> Color {
+    app.world()
+        .resource::<UiTheme>()
+        .color(&tokens::SUBPANE_BODY_BG)
 }
 
 #[test]
@@ -41,11 +42,13 @@ fn uses_the_dark_theme_by_default() {
     let mut app = App::new();
     app.add_plugins((headless_plugins(), ConsolePlugin));
     let dark = bevy::feathers::dark_theme::create_dark_theme();
-    assert!(theme_color(&app).is_some());
-    assert_eq!(
-        theme_color(&app),
-        dark.color.get(&tokens::SUBPANE_BODY_BG).copied()
+    let theme = &app.world().resource::<UiTheme>().0;
+    assert!(
+        theme
+            .token_assignments
+            .contains_key(&tokens::SUBPANE_BODY_BG)
     );
+    assert_eq!(theme_color(&app), dark.color(&tokens::SUBPANE_BODY_BG));
 }
 
 #[test]
@@ -55,7 +58,7 @@ fn keeps_the_plugins_and_theme_of_the_app() {
         .insert_resource(pink_theme())
         .add_plugins(ConsolePlugin);
     start(&mut app);
-    assert_eq!(theme_color(&app), Some(Color::srgb(1.0, 0.0, 1.0)));
+    assert_eq!(theme_color(&app), PINK);
 }
 
 #[test]
@@ -64,7 +67,7 @@ fn keeps_a_theme_inserted_before_any_plugin() {
     app.insert_resource(pink_theme())
         .add_plugins((headless_plugins(), ConsolePlugin));
     start(&mut app);
-    assert_eq!(theme_color(&app), Some(Color::srgb(1.0, 0.0, 1.0)));
+    assert_eq!(theme_color(&app), PINK);
 }
 
 #[test]

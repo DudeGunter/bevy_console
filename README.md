@@ -61,4 +61,5 @@ close the console, as long as the text input does not have focus.
 
 | Bevy | Branch |
 | ---- | ------ |
+| 0.20 | `0.20` |
 | 0.19 | `0.19` |
