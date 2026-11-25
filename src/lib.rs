@@ -5,8 +5,11 @@ use bevy::{
 };
 
 mod app_ext;
+mod arguments;
+mod blocking;
 mod commands;
 mod default_commands;
+mod into_command;
 mod logging;
 mod ui;
 
@@ -49,32 +52,34 @@ impl Plugin for ConsolePlugin {
             app.add_plugins(FeathersCorePlugin);
         }
 
-        app.init_resource::<ConsoleSettings>();
+        app.add_plugins(blocking::plugin);
+        app.init_resource::<ConsoleSettings>()
+            .init_resource::<ui::history::CommandHistory>()
+            .init_resource::<ui::completion::Completion>();
         app.add_systems(Startup, ui::spawn_ui);
         app.add_systems(
             Update,
             (
+                ui::input::open_close_console,
+                ui::input::focus_opened_console,
                 ui::input::handle_text_input,
+                // After the commands that were entered.
                 ui::message::receive_traced_message,
-                ui::open_close_console,
-            ),
+                ui::completion::update_suggestions,
+            )
+                .chain(),
         );
         app.add_observer(commands::try_command);
 
         use app_ext::*;
         use default_commands::*;
-        app.add_command(clear).describe_command(
-            "clear",
-            "Removes every message from the console.",
-            "clear",
-        );
-        app.add_command_piped(help).describe_command(
-            "help",
-            "Lists the commands, or describes one of them.",
-            "help [command]",
-        );
-        app.add_command(quit)
-            .describe_command("quit", "Exits the app.", "quit");
+        use into_command::IntoCommand;
+        app.add_commands((
+            clear.about("Removes every message from the console."),
+            help.about("Lists the commands, or describes one of them.")
+                .usage("help [command]"),
+            quit.about("Exits the app."),
+        ));
     }
 
     // Plugins may be added in any order, so this has to wait until all of them are built.
@@ -88,26 +93,72 @@ impl Plugin for ConsolePlugin {
 }
 
 /// Configures the console. Can be inserted before or after [`ConsolePlugin`] and changed at runtime.
+/// ```
+/// # use bevy::prelude::*;
+/// # use bevy_console::prelude::*;
+/// App::new().insert_resource(ConsoleSettings {
+///     toggle_key: KeyCode::Backquote,
+///     start_open: false,
+///     ..default()
+/// });
+/// ```
 #[derive(Resource, Debug, Clone, PartialEq, Eq)]
 pub struct ConsoleSettings {
     /// The oldest messages are removed once there are more than this many.
     pub max_messages: usize,
+    /// Opens and closes the console, T by default. While its text input has focus, letters, digits
+    /// and space are typed instead, but Escape always closes it.
+    pub toggle_key: KeyCode,
+    /// Whether the console is open at startup. True by default.
+    pub start_open: bool,
+    /// Whether the text input gets the focus when the console is opened. Does not apply at startup,
+    /// so that the app keeps it. True by default.
+    pub focus_on_open: bool,
+    /// Whether input that is meant for the console is hidden from the app. True by default.
+    ///
+    /// Keys are hidden from [`ButtonInput`] while the text input has focus. Mouse buttons that are
+    /// pressed over the console are hidden until they are released, and so is scrolling over it, from
+    /// [`AccumulatedMouseScroll`](bevy::input::mouse::AccumulatedMouseScroll). Messages and gamepads
+    /// are not affected, but see [`typing_in_console`](prelude::typing_in_console).
+    pub block_input: bool,
+    /// Whether entries are repeated above their output. True by default.
+    pub echo: bool,
+    /// How many entries can be recalled with the up and down keys. 100 by default.
+    pub max_history: usize,
+    /// How many suggestions are shown at once, or 0 to show neither those nor the usage.
+    /// Tab completes either way. 5 by default.
+    pub max_suggestions: usize,
 }
 
 impl Default for ConsoleSettings {
     fn default() -> Self {
-        Self { max_messages: 500 }
+        Self {
+            max_messages: 500,
+            toggle_key: KeyCode::KeyT,
+            start_open: true,
+            focus_on_open: true,
+            block_input: true,
+            echo: true,
+            max_history: 100,
+            max_suggestions: 5,
+        }
     }
 }
 
 pub mod prelude {
     pub use crate::app_ext::*;
+    pub use crate::blocking::{ConsoleSystems, typing_in_console};
     pub use crate::commands::{
-        CommandExec, CommandMetadata, ConsoleCommand, DeferredCommand, TryCommand,
+        CommandExec, CommandMetadata, ConsoleCommand, DeferredCommand, RunCommand, TryCommand,
+    };
+    pub use crate::into_command::{
+        CommandBuilder, ConsoleInput, ConsoleOutput, IntoCommand, IntoCommands,
     };
     pub use crate::logging::custom_log_layer;
     pub use crate::simple;
-    pub use crate::ui::{ConsoleUI, MessageContainer, message::ConsoleMessage};
+    pub use crate::ui::{
+        ConsoleUI, MessageContainer, completion::SuggestionList, message::ConsoleMessage,
+    };
     pub use crate::{ConsolePlugin, ConsoleSettings};
     pub use bevy::log::LogPlugin;
     pub use tracing;

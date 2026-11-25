@@ -33,7 +33,7 @@ fn echo(In(args): In<Vec<String>>, mut calls: ResMut<Calls>) {
 #[test]
 fn entries_run_commands_and_clear_the_input() {
     let mut app = app();
-    app.add_command_piped(echo);
+    app.add_command(echo);
     start(&mut app);
 
     focus_text_input(&mut app);
@@ -52,7 +52,7 @@ fn entries_run_commands_and_clear_the_input() {
 #[test]
 fn enter_is_ignored_without_focus() {
     let mut app = app();
-    app.add_command_piped(echo);
+    app.add_command(echo);
     start(&mut app);
 
     focus_text_input(&mut app);
@@ -67,8 +67,8 @@ fn enter_is_ignored_without_focus() {
 #[test]
 fn events_and_messages_reach_the_app() {
     let mut app = app();
-    app.add_command_event(Special)
-        .add_command_message_named("win", Score(10))
+    app.add_command(Special)
+        .add_command(("win", Score(10)))
         .add_observer(|_: On<Special>, mut calls: ResMut<Calls>| {
             calls.0.push("special".into());
         })
@@ -114,8 +114,7 @@ fn t_opens_and_closes_the_console() {
     press_t(&mut app);
     assert_eq!(visibility(&mut app), Visibility::Visible);
 
-    // While typing, it is just a letter.
-    focus_text_input(&mut app);
+    // Opening it focused the text input, where it is just a letter.
     press_t(&mut app);
     assert_eq!(visibility(&mut app), Visibility::Visible);
     assert_eq!(text_input_value(&mut app), "t");

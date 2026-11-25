@@ -23,31 +23,92 @@ fn main() {
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn(Camera2d);
         })
-        .add_command_piped(greet)
-        .describe_command("greet", "Greets someone.", "greet <name>")
+        .add_command(greet)
         .run();
 }
 
-fn greet(In(args): In<Vec<String>>) {
-    match args.first() {
-        Some(name) => simple!("Hello, {name}!"),
-        None => warn!("Usage: greet <name>"),
-    }
+fn greet(In(name): In<String>) -> String {
+    format!("Hello, {name}!")
 }
 ```
 
-Click the text input and type `greet Ferris`, or `help` for a list of commands. Press T to open and
-close the console, as long as the text input does not have focus.
+Click the text input and type `greet Ferris`, or `help` for a list of commands.
 
-| To run             | Use                                                 |
-| ------------------ | --------------------------------------------------- |
-| a system           | `add_command`, `add_command_named`                  |
-| one with arguments | `add_command_piped`, `add_command_piped_named`      |
-| an event           | `add_command_event`, `add_command_event_named`      |
-| a message          | `add_command_message`, `add_command_message_named`  |
+| Key             | Does                                                                        |
+| --------------- | --------------------------------------------------------------------------- |
+| T               | opens the console, and closes it unless you are typing                      |
+| Escape          | closes the console while you are typing                                     |
+| Tab, Shift+Tab  | goes through what could be typed: commands, enums and `bool`s               |
+| Up, Down        | goes through earlier entries                                                |
+| Enter           | runs the command                                                            |
+
+## Commands
+
+`add_command` takes whatever you have, and you only add detail when you need it:
+
+```rust
+app
+    // Functions, with or without arguments.
+    .add_command(quit)
+    .add_command(add)
+    // Events and messages, of which a clone is sent.
+    .add_command(Explosion { radius: 5.0 })
+    // Anything with a name of its own, which closures need.
+    .add_command(("hi", || "Hello!"))
+    // Anything with more details.
+    .add_command(
+        buy.named("shop.buy")
+            .about("Buys something.")
+            .available_if(in_state(Shopping)),
+    )
+    // Several at once.
+    .add_commands((pause, resume.about("Continues.")));
+```
+
+Arguments are whatever type is inside of `In`:
+
+```rust
+fn add(In((a, b)): In<(f32, f32)>) -> f32 {
+    a + b
+}
+
+/// Gives someone items.
+#[derive(Reflect)]
+struct Give {
+    item: Item,
+    /// Everyone by default.
+    player: Option<String>,
+}
+
+fn give(In(give): In<Give>) -> Result<String> { /* ... */ }
+```
+
+- Numbers, `bool`, `char`, `String`, enums, structs, tuples, arrays, `Option` and `Vec` can be read.
+  `Option` and `Vec` take what is left, so put them last. Quotes keep words together.
+- What a command returns is shown, and errors are logged, so `?` works.
+- `help give` shows the usage, and the doc comments of the struct and its fields. Those of functions
+  can't be read, so use `about` instead.
+- A command can also be run by triggering `TryCommand::from_entry("give sword".into())`.
+- The older `add_command_*` methods still work, but are deprecated.
+
+## Other features
 
 - `simple!` logs a message without its time, level and target.
-- `ConsoleSettings` limits how many messages are kept, 500 by default.
+- `ConsoleSettings` changes the key, whether the console starts open and takes the focus, whether
+  input is blocked, whether entries are repeated, and how many messages, earlier entries and suggestions there are:
+
+  ```rust
+  app.insert_resource(ConsoleSettings {
+      toggle_key: KeyCode::Backquote,
+      start_open: false,
+      ..default()
+  });
+  ```
+- What you type, click and scroll in the console is hidden from the `ButtonInput` and
+  `AccumulatedMouseScroll` of your app. Systems that read messages like `KeyboardInput` can use
+  `run_if(not(typing_in_console))`, and those that read input in `PreUpdate` should run after
+  `ConsoleSystems::BlockInput`.
+- New messages are followed, unless you have scrolled up to read.
 - If your app uses Feathers as well, add `FeathersPlugins` before `ConsolePlugin`. A `UiTheme` you
   insert is left alone.
 

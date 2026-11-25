@@ -1,6 +1,7 @@
 //! The console in an app that already uses Feathers, with its own theme and settings.
 //!
-//! Run with `cargo run --example custom_theme`. Only the newest 10 messages are kept.
+//! Run with `cargo run --example custom_theme`. Only the newest 10 messages are kept, and
+//! the console is opened and closed with ` instead of T.
 
 use bevy::{
     feathers::{
@@ -45,7 +46,11 @@ fn main() {
             FeathersPlugins,
         ))
         .insert_resource(UiTheme(theme))
-        .insert_resource(ConsoleSettings { max_messages: 10 })
+        .insert_resource(ConsoleSettings {
+            max_messages: 10,
+            toggle_key: KeyCode::Backquote,
+            ..default()
+        })
         .add_plugins(ConsolePlugin)
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn(Camera2d);

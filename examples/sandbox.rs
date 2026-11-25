@@ -26,18 +26,21 @@ fn main() {
         })
         .add_systems(Startup, setup)
         .add_systems(Update, orbit)
-        .add_command_piped(spawn)
-        .describe_command("spawn", "Spawns squares.", "spawn [amount]")
-        .add_command_piped(speed)
-        .describe_command("speed", "Sets the speed of all squares.", "speed <number>")
-        .add_command_piped(color)
-        .describe_command("color", "Colors all squares.", "color <red> <green> <blue>")
-        .add_command(pause)
-        .describe_command("pause", "Stops or resumes all squares.", "pause")
-        .add_command(despawn_all)
-        .describe_command("despawn_all", "Removes all squares.", "despawn_all")
-        .add_command_named("settings", debug_resource::<Settings>)
-        .describe_command("settings", "Prints the current settings.", "settings")
+        .add_commands((
+            spawn.about("Spawns squares.").usage("spawn [amount]"),
+            speed
+                .about("Sets the speed of all squares.")
+                .usage("speed <number>"),
+            color,
+            pause.about("Stops or resumes all squares."),
+            despawn_all
+                .about("Removes all squares.")
+                .available_if(any_with_component::<Orbit>),
+            (
+                "settings",
+                debug_resource::<Settings>.about("Prints the current settings."),
+            ),
+        ))
         .run();
 }
 
@@ -74,15 +77,15 @@ fn orbit(
     }
 }
 
-fn spawn(In(args): In<Vec<String>>, mut commands: Commands, squares: Query<(), With<Orbit>>) {
-    let amount = match args.first().map(|arg| arg.parse::<usize>()) {
-        None => 1,
-        Some(Ok(amount)) if amount <= 1000 => amount,
-        Some(_) => {
-            error!("The amount must be a number from 0 to 1000.");
-            return;
-        }
-    };
+fn spawn(
+    In(amount): In<Option<usize>>,
+    mut commands: Commands,
+    squares: Query<(), With<Orbit>>,
+) -> Result<String, &'static str> {
+    let amount = amount.unwrap_or(1);
+    if amount > 1000 {
+        return Err("the amount must be a number from 0 to 1000");
+    }
     let existing = squares.iter().count();
     for i in existing..existing + amount {
         let i = i as f32;
@@ -94,39 +97,38 @@ fn spawn(In(args): In<Vec<String>>, mut commands: Commands, squares: Query<(), W
             },
         ));
     }
-    simple!("Spawned {amount}, there are now {}.", existing + amount);
+    Ok(format!(
+        "Spawned {amount}, there are now {}.",
+        existing + amount
+    ))
 }
 
-fn speed(In(args): In<Vec<String>>, mut settings: ResMut<Settings>) {
-    let Some(Ok(speed)) = args.first().map(|arg| arg.parse()) else {
-        error!("Usage: speed <number>");
-        return;
-    };
+fn speed(In(speed): In<f32>, mut settings: ResMut<Settings>) -> String {
     settings.speed = speed;
-    simple!("The speed is now {speed}.");
+    format!("The speed is now {speed}.")
 }
 
-fn color(In(args): In<Vec<String>>, mut squares: Query<&mut Sprite, With<Orbit>>) {
-    let channels: Vec<f32> = args.iter().filter_map(|arg| arg.parse().ok()).collect();
-    let [red, green, blue] = channels[..] else {
-        error!("Usage: color <red> <green> <blue>, each from 0 to 1");
-        return;
-    };
+/// Colors all squares. Each channel goes from 0 to 1.
+#[derive(Reflect)]
+struct Channels {
+    red: f32,
+    green: f32,
+    blue: f32,
+}
+
+fn color(In(channels): In<Channels>, mut squares: Query<&mut Sprite, With<Orbit>>) {
     for mut sprite in &mut squares {
-        sprite.color = Color::srgb(red, green, blue);
+        sprite.color = Color::srgb(channels.red, channels.green, channels.blue);
     }
 }
 
-fn pause(mut settings: ResMut<Settings>) {
+fn pause(mut settings: ResMut<Settings>) -> &'static str {
     settings.paused = !settings.paused;
-    simple!(
-        "{}",
-        if settings.paused {
-            "Paused."
-        } else {
-            "Resumed."
-        }
-    );
+    if settings.paused {
+        "Paused."
+    } else {
+        "Resumed."
+    }
 }
 
 fn despawn_all(mut commands: Commands, squares: Query<Entity, With<Orbit>>) {

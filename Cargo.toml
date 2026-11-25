@@ -9,6 +9,7 @@ bevy = { version = "0.20", default-features = false, features = [
     "bevy_log",
     "bevy_picking",
     "bevy_scene",
+    "reflect_documentation",
     "ui_picking",
 ] }
 crossbeam = "0.8"

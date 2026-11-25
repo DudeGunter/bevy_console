@@ -35,12 +35,20 @@ impl ConsoleMessage {
 
 pub fn receive_traced_message(
     mut commands: Commands,
-    container: Single<(Entity, Option<&Children>, &mut ScrollPosition), With<MessageContainer>>,
-    rows: Query<(), With<ConsoleMessage>>,
+    container: Single<
+        (
+            Entity,
+            Option<&Children>,
+            &ComputedNode,
+            &mut ScrollPosition,
+        ),
+        With<MessageContainer>,
+    >,
+    rows: Query<&ComputedNode, With<ConsoleMessage>>,
     settings: Res<ConsoleSettings>,
     traced_messages: Option<Res<TracingReceiver>>,
 ) {
-    let (entity, children, mut scroll_position) = container.into_inner();
+    let (entity, children, node, mut scroll_position) = container.into_inner();
 
     // Only what will be kept is worth spawning.
     let mut traces = VecDeque::new();
@@ -64,8 +72,18 @@ pub fn receive_traced_message(
         .filter(|child| rows.contains(*child))
         .collect();
     let excess = (current.len() + traces.len()).saturating_sub(settings.max_messages);
+    let mut removed_height = 0.0;
     for row in current.into_iter().take(excess) {
+        removed_height += rows.get(row).map_or(0.0, logical_height);
         commands.entity(row).try_despawn();
+    }
+
+    // Follow new messages, unless earlier ones are being read. Those have to stay in place.
+    let max_scroll = (node.content_size().y - node.size().y).max(0.0) * node.inverse_scale_factor();
+    if scroll_position.y >= max_scroll - 1.0 {
+        scroll_position.y = f32::MAX;
+    } else if removed_height > 0.0 {
+        scroll_position.y = (scroll_position.y - removed_height).max(0.0);
     }
 
     if traces.is_empty() {
@@ -76,7 +94,10 @@ pub fn receive_traced_message(
         .map(|trace| spawn_message(&mut commands, trace))
         .collect();
     commands.entity(entity).add_children(&new_messages);
-    scroll_position.0.y = f32::MAX;
+}
+
+fn logical_height(node: &ComputedNode) -> f32 {
+    node.size().y * node.inverse_scale_factor()
 }
 
 fn spawn_message(commands: &mut Commands, trace: TraceMessage) -> Entity {

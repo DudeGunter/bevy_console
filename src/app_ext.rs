@@ -1,48 +1,93 @@
-use crate::commands::*;
+use crate::{
+    arguments::Argument,
+    commands::*,
+    into_command::{CommandBuilder, IntoCommand, IntoCommands, short_type_name},
+};
 use bevy::prelude::*;
 
 /// Adds console commands to an [`App`].
 ///
-/// Methods that do not end in `_named` name the command after the type of the system, event or
-/// message, without its module path. Closures have no usable type name, so give those a name.
+/// Commands are named after the function, event or message, without its module path. Closures have
+/// no usable name, so give those one.
 pub trait ConsoleAppExt {
-    /// Runs the given system when the command is called.
-    fn add_command<M: 'static, F>(&mut self, system: F) -> &mut Self
-    where
-        F: IntoSystem<(), (), M> + Send + Sync + 'static;
+    /// Adds a function, closure, event or message as a command. See [`IntoCommand`] for everything
+    /// that is accepted.
+    /// ```
+    /// use bevy::prelude::*;
+    /// use bevy_console::prelude::*;
+    ///
+    /// fn pause(mut time: ResMut<Time<Virtual>>) {
+    ///     time.pause();
+    /// }
+    ///
+    /// // Arguments are read from what comes after the name, and the text is shown.
+    /// fn teleport(In((x, y)): In<(f32, f32)>, mut query: Query<&mut Transform>) -> String {
+    ///     for mut transform in &mut query {
+    ///         transform.translation = Vec3::new(x, y, 0.0);
+    ///     }
+    ///     format!("Teleported to {x}, {y}.")
+    /// }
+    ///
+    /// // Structs give the arguments names.
+    /// /// Gives someone items.
+    /// #[derive(Reflect)]
+    /// struct Give {
+    ///     player: String,
+    ///     /// 1 by default.
+    ///     amount: Option<u32>,
+    /// }
+    ///
+    /// fn give(In(give): In<Give>) -> String {
+    ///     format!("Gave {} to {}.", give.amount.unwrap_or(1), give.player)
+    /// }
+    ///
+    /// #[derive(Event, Clone)]
+    /// struct Explosion {
+    ///     radius: f32,
+    /// }
+    ///
+    /// App::new()
+    ///     .add_command(pause)
+    ///     .add_command(teleport.about("Moves everything."))
+    ///     .add_command(give)
+    ///     .add_command(Explosion { radius: 5.0 })
+    ///     .add_command(("hi", || "Hello!"))
+    ///     .add_command(
+    ///         pause
+    ///             .named("stop")
+    ///             .about("Same as pause, but only with a camera.")
+    ///             .available_if(any_with_component::<Camera>),
+    ///     );
+    /// ```
+    fn add_command<M>(&mut self, command: impl IntoCommand<M>) -> &mut Self;
 
-    /// Like [`add_command`](Self::add_command), with a custom name.
+    /// Adds a tuple of commands.
+    /// ```
+    /// # use bevy::prelude::*;
+    /// # use bevy_console::prelude::*;
+    /// # fn pause() {}
+    /// # fn speed(In(speed): In<f32>) {}
+    /// App::new().add_commands((pause, speed.about("Sets the speed."), ("hi", || "Hello!")));
+    /// ```
+    fn add_commands<M>(&mut self, commands: impl IntoCommands<M>) -> &mut Self;
+
+    /// Runs the given system when the command is called.
+    #[deprecated = "use `add_command((name, system))`"]
     fn add_command_named<S: Into<String>, M: 'static>(
         &mut self,
         name: S,
         system: impl IntoSystem<(), (), M> + Send + Sync + 'static,
     ) -> &mut Self;
 
-    /// Runs the given system when the command is called, passing it the whitespace separated
-    /// arguments which came after the name of the command.
-    ///
-    /// The system must accept `In<Vec<String>>` in addition to its other parameters.
-    /// ```
-    /// use bevy::prelude::*;
-    /// use bevy_console::prelude::*;
-    ///
-    /// fn teleport(In(args): In<Vec<String>>, mut query: Query<&mut Transform>) {
-    ///     let Some(x) = args.first().and_then(|x| x.parse().ok()) else {
-    ///         warn!("Usage: teleport <x>");
-    ///         return;
-    ///     };
-    ///     for mut transform in &mut query {
-    ///         transform.translation.x = x;
-    ///     }
-    /// }
-    ///
-    /// App::new().add_command_piped(teleport);
-    /// ```
+    /// Runs the given system when the command is called, passing it the arguments which came after
+    /// the name of the command.
+    #[deprecated = "use `add_command(system)`, which accepts systems with any arguments"]
     fn add_command_piped<M: 'static, F>(&mut self, system: F) -> &mut Self
     where
         F: IntoSystem<In<Vec<String>>, (), M> + Send + Sync + 'static;
 
-    /// Like [`add_command_piped`](Self::add_command_piped), with a custom name.
+    /// Like `add_command_piped`, with a custom name.
+    #[deprecated = "use `add_command((name, system))`"]
     fn add_command_piped_named<S: Into<String>, M: 'static>(
         &mut self,
         name: S,
@@ -50,12 +95,14 @@ pub trait ConsoleAppExt {
     ) -> &mut Self;
 
     /// Triggers a clone of the given event when the command is called.
+    #[deprecated = "use `add_command(event)`"]
     fn add_command_event<E>(&mut self, event: E) -> &mut Self
     where
         E: Event + Clone,
         for<'a> E::Trigger<'a>: Default;
 
-    /// Like [`add_command_event`](Self::add_command_event), with a custom name.
+    /// Like `add_command_event`, with a custom name.
+    #[deprecated = "use `add_command((name, event))`"]
     fn add_command_event_named<S, E>(&mut self, name: S, event: E) -> &mut Self
     where
         S: Into<String>,
@@ -64,18 +111,21 @@ pub trait ConsoleAppExt {
 
     /// Writes the default value of the message when the command is called.
     /// Also registers the message, if that has not been done yet.
+    #[deprecated = "use `add_command(message)`"]
     fn add_command_message<M: Message + Default + Clone>(&mut self) -> &mut Self;
 
     /// Writes a clone of the given message when the command is called.
     /// Also registers the message, if that has not been done yet.
+    #[deprecated = "use `add_command((name, message))`"]
     fn add_command_message_named<S: Into<String>, M: Message + Clone>(
         &mut self,
         name: S,
         message: M,
     ) -> &mut Self;
 
-    /// Sets what `help` shows for every command with the given name.
-    /// The commands must have been added already.
+    /// Replaces what `help` shows for every command with the given name.
+    /// The commands must have been added already. For your own commands, prefer
+    /// [`about`](IntoCommand::about).
     fn describe_command(
         &mut self,
         name: &str,
@@ -84,12 +134,20 @@ pub trait ConsoleAppExt {
     ) -> &mut Self;
 }
 
+#[allow(deprecated)]
 impl ConsoleAppExt for App {
-    fn add_command<M: 'static, F>(&mut self, system: F) -> &mut Self
-    where
-        F: IntoSystem<(), (), M> + Send + Sync + 'static,
-    {
-        self.add_command_named(short_type_name::<F>(), system)
+    fn add_command<M>(&mut self, command: impl IntoCommand<M>) -> &mut Self {
+        spawn_command(self.world_mut(), command.into_command());
+        self
+    }
+
+    fn add_commands<M>(&mut self, commands: impl IntoCommands<M>) -> &mut Self {
+        let mut builders = Vec::new();
+        commands.push_to(&mut builders);
+        for builder in builders {
+            spawn_command(self.world_mut(), builder);
+        }
+        self
     }
 
     fn add_command_named<S: Into<String>, M: 'static>(
@@ -188,59 +246,54 @@ impl ConsoleAppExt for App {
     }
 }
 
-fn short_type_name<T>() -> &'static str {
-    let name = std::any::type_name::<T>();
-    // Find the last '::' that isn't inside angle brackets
-    let mut depth = 0usize;
-    let mut last_colon = 0;
-    let bytes = name.as_bytes();
-    for i in 0..bytes.len() {
-        match bytes[i] {
-            b'<' => depth += 1,
-            b'>' => depth = depth.saturating_sub(1),
-            b':' if depth == 0 && i + 1 < bytes.len() && bytes[i + 1] == b':' => {
-                last_colon = i + 2;
-            }
-            _ => {}
-        }
+fn spawn_command(world: &mut World, builder: CommandBuilder) {
+    let CommandBuilder {
+        name,
+        description,
+        usage,
+        arguments,
+        unsupported,
+        condition,
+        run,
+    } = builder;
+
+    if name.contains("{{closure}}") {
+        warn!("The closure {name} was added as a command, but has no name that can be typed.");
     }
-    &name[last_colon..]
+    if let Some(path) = unsupported {
+        error!("The command {name} cannot be used, as {path} cannot be read from text.");
+    }
+    let usage = usage.unwrap_or_else(|| {
+        let mut words = vec![name.clone()];
+        words.extend(arguments.iter().map(Argument::usage));
+        words.join(" ")
+    });
+
+    let run = run(world);
+    let condition = condition.map(|condition| CommandCondition(condition(world)));
+    let mut entity = world.spawn((
+        ConsoleCommand(name),
+        CommandExec::Run(run),
+        CommandMetadata { description, usage },
+        CommandArguments(arguments),
+    ));
+    if let Some(condition) = condition {
+        entity.insert(condition);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    struct Plain;
-    struct Generic<T>(std::marker::PhantomData<T>);
-
     fn system() {}
-
-    fn name_of<T>(_: T) -> &'static str {
-        short_type_name::<T>()
-    }
-
-    #[test]
-    fn short_type_name_removes_the_module_path() {
-        assert_eq!(short_type_name::<Plain>(), "Plain");
-        assert_eq!(short_type_name::<u32>(), "u32");
-        assert_eq!(name_of(system), "system");
-    }
-
-    #[test]
-    fn short_type_name_keeps_the_path_of_generics() {
-        assert_eq!(
-            short_type_name::<Generic<Plain>>(),
-            format!("Generic<{}>", std::any::type_name::<Plain>())
-        );
-    }
 
     #[test]
     fn describe_command_applies_to_every_command_with_the_name() {
         let mut app = App::new();
-        app.add_command_named("twin", system)
-            .add_command_named("twin", system)
-            .add_command_named("other", system)
+        app.add_command(("twin", system))
+            .add_command(("twin", system))
+            .add_command(("other", system))
             .describe_command("twin", "One of two.", "twin");
 
         let world = app.world_mut();
@@ -248,6 +301,7 @@ mod tests {
             .query::<(&ConsoleCommand, &CommandMetadata)>()
             .iter(world)
             .map(|(command, metadata)| (command.0.as_str(), metadata.description.as_str()))
+            .filter(|(_, description)| !description.is_empty())
             .collect();
         assert_eq!(described, [("twin", "One of two."); 2]);
     }

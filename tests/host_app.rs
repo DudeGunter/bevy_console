@@ -80,7 +80,10 @@ fn accepts_tab_navigation_without_the_rest_of_feathers() {
 #[test]
 fn keeps_settings_inserted_first() {
     let mut app = App::new();
-    app.insert_resource(ConsoleSettings { max_messages: 3 })
-        .add_plugins((headless_plugins(), ConsolePlugin));
+    app.insert_resource(ConsoleSettings {
+        max_messages: 3,
+        ..default()
+    })
+    .add_plugins((headless_plugins(), ConsolePlugin));
     assert_eq!(app.world().resource::<ConsoleSettings>().max_messages, 3);
 }

@@ -3,15 +3,19 @@
 //! Run with `cargo run --example basic`, click the text input, and try these:
 //! - `help`, `help greet`
 //! - `count_entities`
-//! - `greet Ferris`
+//! - `greet Ferris`, `greet "Ferris the crab"`
+//! - `add 1 2`
+//! - `give sword 3 Ferris`, `give sword x`
+//! - `fails`
+//! - `win`, which only works once something was scored
 //! - `twice`
 //! - `Explosion`, `big_explosion`
 //! - `Score`, `jackpot`
 //! - `score`
 //! - `overload`
 //!
-//! Press T to open and close the console. While the text input has focus T is just a letter, so
-//! click outside the console first.
+//! Tab completes, and the up and down keys recall earlier entries. Press T to open the console, and
+//! Escape to close it. T closes it too, unless the text input has focus, where it is just a letter.
 
 use bevy::prelude::*;
 use bevy_console::prelude::*;
@@ -30,22 +34,29 @@ fn main() {
         .add_systems(Startup, spawn_camera)
         .add_systems(Update, add_score)
         .add_observer(on_explosion)
-        // Systems, named after the function.
+        // Functions, which become commands of the same name.
         .add_command(count_entities)
         .add_command(overload)
-        // Systems that take arguments.
-        .add_command_piped(greet)
-        .describe_command("greet", "Greets someone.", "greet <name>")
+        // Functions that take arguments, which are read from the text.
+        .add_command(add)
+        .add_command(give)
+        // Anything can be described, and several can be added at once.
+        .add_commands((
+            greet.about("Greets someone."),
+            fails.about("Shows what happens to errors."),
+        ))
         // Closures need a name. All commands with the same name are executed.
-        .add_command_named("twice", || simple!("This is the first one."))
-        .add_command_named("twice", || simple!("This is the second one."))
+        .add_command(("twice", || "This is the first one."))
+        .add_command(("twice", || "This is the second one."))
         // Events and messages, named after the type or explicitly.
-        .add_command_event(Explosion { radius: 1.0 })
-        .add_command_event_named("big_explosion", Explosion { radius: 50.0 })
-        .add_command_message::<Score>()
-        .add_command_message_named("jackpot", Score(1000))
+        .add_command(Explosion { radius: 1.0 })
+        .add_command(("big_explosion", Explosion { radius: 50.0 }))
+        .add_command(Score(1))
+        .add_command(("jackpot", Score(1000)))
         // Prints any resource that implements Debug.
-        .add_command_named("score", debug_resource::<TotalScore>)
+        .add_command(("score", debug_resource::<TotalScore>))
+        // Only runs while a condition is true.
+        .add_command(win.available_if(has_scored))
         .run();
 }
 
@@ -55,8 +66,9 @@ fn spawn_camera(mut commands: Commands) {
     info!("Welcome! Type help for a list of commands.");
 }
 
-fn count_entities(query: Query<Entity>) {
-    simple!("There are {} entities.", query.iter().count());
+// Text that is returned gets shown.
+fn count_entities(query: Query<Entity>) -> String {
+    format!("There are {} entities.", query.iter().count())
 }
 
 fn overload() {
@@ -65,11 +77,39 @@ fn overload() {
     }
 }
 
-fn greet(In(args): In<Vec<String>>) {
-    match args.first() {
-        Some(name) => simple!("Hello, {name}!"),
-        None => warn!("Usage: greet <name>"),
-    }
+fn greet(In(name): In<String>) -> String {
+    format!("Hello, {name}!")
+}
+
+fn add(In((a, b)): In<(f32, f32)>) -> f32 {
+    a + b
+}
+
+// A struct gives names to the arguments. The comments are shown by `help give`.
+/// Gives someone items.
+#[derive(Reflect)]
+struct Give {
+    item: Item,
+    amount: u32,
+    /// Everyone by default.
+    player: Option<String>,
+}
+
+#[derive(Reflect, Debug)]
+enum Item {
+    Sword,
+    Apple,
+}
+
+fn give(In(give): In<Give>) -> String {
+    let player = give.player.as_deref().unwrap_or("everyone");
+    format!("Gave {:?} x{} to {player}.", give.item, give.amount)
+}
+
+// Errors are logged, so `?` works.
+fn fails() -> Result {
+    "not a number".parse::<i32>()?;
+    Ok(())
 }
 
 #[derive(Event, Clone)]
@@ -84,12 +124,6 @@ fn on_explosion(explosion: On<Explosion>) {
 #[derive(Message, Clone)]
 struct Score(u32);
 
-impl Default for Score {
-    fn default() -> Self {
-        Self(1)
-    }
-}
-
 #[derive(Resource, Debug, Default)]
 struct TotalScore(u32);
 
@@ -98,4 +132,12 @@ fn add_score(mut reader: MessageReader<Score>, mut total: ResMut<TotalScore>) {
         total.0 += score.0;
         simple!("Scored {}.", score.0);
     }
+}
+
+fn has_scored(total: Res<TotalScore>) -> bool {
+    total.0 > 0
+}
+
+fn win() -> &'static str {
+    "You win!"
 }
